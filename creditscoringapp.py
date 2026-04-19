@@ -122,7 +122,6 @@ st.download_button("Download Predictions", data_df.to_csv(index=False), "predict
 st.subheader("Business Interpretation (XGBoost)")
 
 try:
-    # Use batch features if batch exists; otherwise Cloudflare dataset
     if batch is not None and all(col in batch.columns for col in FEATURE_COLUMNS):
         sample_row = batch[FEATURE_COLUMNS].iloc[[0]]
         background = batch[FEATURE_COLUMNS].sample(min(50, len(batch)))
@@ -133,25 +132,27 @@ try:
         sample_row = pd.DataFrame(np.zeros((1, len(FEATURE_COLUMNS))), columns=FEATURE_COLUMNS)
         background = sample_row
 
-    # SHAP explainer
     explainer = shap.Explainer(lambda x: xgb_model.predict_proba(x)[:,1], background)
     shap_values = explainer(sample_row)
 
-    # Waterfall plot
     fig, ax = plt.subplots()
     shap.plots.waterfall(shap_values[0], show=False)
     st.pyplot(fig)
 
-    # Top 3 features
     feature_impact = pd.DataFrame({
         "Feature": FEATURE_COLUMNS,
         "SHAP_Value": shap_values.values[0]
     }).sort_values(by="SHAP_Value", key=abs, ascending=False)
 
-    st.markdown("**Top 3 features influencing the XGBoost prediction:**")
-    for i, row in feature_impact.head(3).iterrows():
-        direction = "increases" if row['SHAP_Value'] > 0 else "decreases"
-        st.write(f"- {row['Feature']} {direction} the likelihood of delinquency (impact: {row['SHAP_Value']:.2f})")
+    st.markdown("**Top 3 drivers of default risk (XGBoost):**")
+
+    for _, row in feature_impact.head(3).iterrows():
+        if row["SHAP_Value"] > 0:
+            meaning = "INCREASES default risk"
+        else:
+            meaning = "DECREASES default risk"
+
+        st.write(f"- {row['Feature']} {meaning} (impact: {row['SHAP_Value']:.3f})")
 
 except Exception as e:
     st.warning(f"Business Interpretation failed: {e}")
