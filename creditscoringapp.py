@@ -23,7 +23,7 @@ It supports batch predictions and SHAP-based explainability.
 # ---------------------------
 FEATURE_COLUMNS = [
     "RevolvingUtilizationOfUnsecuredLines",
-    "age",
+    "Age",
     "NumberOfTime30-59DaysPastDueNotWorse",
     "DebtRatio",
     "MonthlyIncome",
