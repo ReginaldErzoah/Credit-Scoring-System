@@ -14,13 +14,12 @@ st.set_page_config(page_title="Credit Scoring System", layout="wide")
 st.title("Credit Scoring & Loan Decision System")
 
 st.markdown("""
-This app predicts the likelihood of a customer defaulting on a loan using Logistic Regression and XGBoost models.
-Predictions are automatically run on the dataset loaded from Cloudflare R2.
-You can also upload your own CSV for batch predictions.
+This app predicts loan default risk using Logistic Regression and XGBoost models.
+Data is loaded from Cloudflare R2, and users can upload CSV files for batch scoring.
 """)
 
 # ---------------------------
-# Feature Columns (FINAL CLEAN SET)
+# Feature Columns
 # ---------------------------
 FEATURE_COLUMNS = [
     "RevolvingUtilizationOfUnsecuredLines",
@@ -36,21 +35,33 @@ FEATURE_COLUMNS = [
 ]
 
 # ---------------------------
-# Cleaning function
+# CLEANING FUNCTION (for R2 + batch)
 # ---------------------------
 def clean_numeric_columns(df):
     return df.applymap(
-        lambda x: float(str(x).replace("[", "").replace("]", "").replace("'", "").replace('"',''))
+        lambda x: float(
+            str(x)
+            .replace("[", "")
+            .replace("]", "")
+            .replace("'", "")
+            .replace('"', "")
+        )
         if isinstance(x, str) else x
     )
 
 # ---------------------------
-# Initialize batch
+# STRICT SHAP CLEANING 
 # ---------------------------
-batch = None
+def force_numeric(df):
+    return df.applymap(
+        lambda x: pd.to_numeric(
+            str(x).replace("[", "").replace("]", ""),
+            errors="coerce"
+        )
+    )
 
 # ---------------------------
-# Load data from R2
+# Load R2 Data
 # ---------------------------
 try:
     R2_ENDPOINT = st.secrets["R2_ENDPOINT_URL"]
@@ -83,7 +94,7 @@ except Exception as e:
     st.stop()
 
 # ---------------------------
-# Load models
+# Load Models
 # ---------------------------
 try:
     logreg_model = joblib.load("models/logreg_v3.pkl")
@@ -97,7 +108,7 @@ except Exception as e:
     st.stop()
 
 # ---------------------------
-# Predictions (Cloud dataset)
+# Predictions
 # ---------------------------
 st.subheader("Predictions on Dataset")
 
@@ -121,16 +132,20 @@ st.download_button(
 st.subheader("Business Interpretation (XGBoost)")
 
 try:
-    # Real sample (NOT median)
-    sample_row = data_df[FEATURE_COLUMNS].sample(1)
+    # STEP 1: Clean SHAP input separately (fixes [5E-1] issue)
+    shap_data = force_numeric(data_df[FEATURE_COLUMNS].copy())
 
-    background = data_df[FEATURE_COLUMNS].sample(min(50, len(data_df)))
+    shap_data = shap_data.dropna()
 
-    # SHAP TreeExplainer (CORRECT METHOD)
+    # STEP 2: Safe sampling
+    sample_row = shap_data.sample(1)
+    background = shap_data.sample(min(50, len(shap_data)))
+
+    # STEP 3: Proper SHAP explainer
     explainer = shap.TreeExplainer(xgb_model)
     shap_values = explainer.shap_values(sample_row)
 
-    # Proper SHAP object for plotting
+    # STEP 4: Build SHAP explanation object
     shap_exp = shap.Explanation(
         values=shap_values[0],
         base_values=explainer.expected_value,
@@ -138,12 +153,12 @@ try:
         feature_names=FEATURE_COLUMNS
     )
 
-    # Plot
+    # STEP 5: Plot
     fig, ax = plt.subplots()
     shap.plots.waterfall(shap_exp, show=False)
     st.pyplot(fig)
 
-    # Top features
+    # STEP 6: Feature importance
     feature_impact = pd.DataFrame({
         "Feature": FEATURE_COLUMNS,
         "SHAP_Value": shap_values[0]
@@ -158,17 +173,18 @@ try:
         )
 
 except Exception as e:
-    st.warning(f"SHAP interpretation failed: {e}")
+    st.warning(f"Business Interpretation failed: {e}")
 
 # ---------------------------
-# Batch upload
+# Batch Upload
 # ---------------------------
-st.subheader("Upload CSV for Batch Prediction")
+st.subheader("Upload CSV for Batch Predictions")
 
 file = st.file_uploader("Upload CSV", type=["csv"])
 
 if file:
     batch = pd.read_csv(file)
+
     batch = clean_numeric_columns(batch)
     batch.fillna(batch.median(), inplace=True)
 
@@ -183,4 +199,5 @@ if file:
     st.download_button(
         "Download Batch Predictions",
         batch.to_csv(index=False),
-        "batch_predictions.csv")
+        "batch_predictions.csv"
+    )
