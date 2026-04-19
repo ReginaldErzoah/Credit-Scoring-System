@@ -46,14 +46,15 @@ def clean_numeric_columns(df):
     )
 
 # ---------------------------
-# Initialize batch variable
+# Initialize batch variable early
 # ---------------------------
 batch = None
-data_df = None
 
 # ---------------------------
 # Load Data from Cloudflare R2
 # ---------------------------
+data_df = None
+
 try:
     R2_ENDPOINT = st.secrets["R2_ENDPOINT_URL"]
     R2_ACCESS_KEY = st.secrets["R2_ACCESS_KEY_ID"]
@@ -98,37 +99,39 @@ try:
     xgb_model = joblib.load("models/xgb_best.pkl")
     scaler = joblib.load("models/scaler_v2.pkl")
     st.success("Models loaded successfully")
-
 except Exception as e:
     st.error(f"Model load error: {e}")
     st.stop()
 
 # ---------------------------
-# Predictions
+# Run Predictions on Cloudflare Dataset
 # ---------------------------
 st.subheader("Predictions on Cloudflare Dataset")
 
 features_df = data_df[FEATURE_COLUMNS].copy()
 scaled_data = scaler.transform(features_df)
-
-data_df["LogReg_Prob"] = logreg_model.predict_proba(scaled_data)[:, 1]
-data_df["XGB_Prob"] = xgb_model.predict_proba(features_df)[:, 1]
+data_df["LogReg_Prob"] = logreg_model.predict_proba(scaled_data)[:,1]
+data_df["XGB_Prob"] = xgb_model.predict_proba(features_df)[:,1]   
 
 st.dataframe(data_df)
 st.download_button("Download Predictions", data_df.to_csv(index=False), "predictions.csv")
 
 # ---------------------------
-# SHAP Interpretation (FIXED INDENTATION)
+# Business Interpretation (XGBoost)
 # ---------------------------
 st.subheader("Business Interpretation (XGBoost)")
 
 try:
+    # Use batch features if batch exists; otherwise Cloudflare dataset
     if batch is not None and all(col in batch.columns for col in FEATURE_COLUMNS):
         sample_row = batch[FEATURE_COLUMNS].iloc[[0]]
         background = batch[FEATURE_COLUMNS].sample(min(50, len(batch)))
-    else:
-        sample_row = data_df[FEATURE_COLUMNS].iloc[[0]]
+    elif data_df is not None:
+        sample_row = data_df[FEATURE_COLUMNS].median().to_frame().T
         background = data_df[FEATURE_COLUMNS].sample(min(50, len(data_df)))
+    else:
+        sample_row = pd.DataFrame(np.zeros((1, len(FEATURE_COLUMNS))), columns=FEATURE_COLUMNS)
+        background = sample_row
 
     # SHAP explainer
     explainer = shap.TreeExplainer(xgb_model)
@@ -147,7 +150,7 @@ try:
     st.pyplot(fig)
 
     # ---------------------------
-    # Top 3 Features
+    # Top 3 features (NOW INSIDE TRY)
     # ---------------------------
     feature_impact = pd.DataFrame({
         "Feature": FEATURE_COLUMNS,
@@ -166,9 +169,8 @@ try:
 
 except Exception as e:
     st.warning(f"Business Interpretation failed: {e}")
-
 # ---------------------------
-# Batch Upload
+# Batch Predictions Upload (at the bottom)
 # ---------------------------
 st.subheader("Upload Your CSV for Batch Predictions")
 
@@ -189,8 +191,8 @@ if file:
     batch_features = batch[FEATURE_COLUMNS]
     batch_scaled = scaler.transform(batch_features)
 
-    batch["LogReg_Prob"] = logreg_model.predict_proba(batch_scaled)[:, 1]
-    batch["XGB_Prob"] = xgb_model.predict_proba(batch_features)[:, 1]
+    batch["LogReg_Prob"] = logreg_model.predict_proba(batch_scaled)[:,1]
+    batch["XGB_Prob"] = xgb_model.predict_proba(batch_features)[:,1]
 
     st.dataframe(batch)
     st.download_button("Download Predictions", batch.to_csv(index=False), "predictions.csv")
