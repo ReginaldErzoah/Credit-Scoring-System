@@ -122,29 +122,44 @@ st.download_button("Download Predictions", data_df.to_csv(index=False), "predict
 st.subheader("Business Interpretation (XGBoost)")
 
 try:
-    # safe sample
-    sample_row = features_df.median().to_frame().T
-    background = features_df.sample(min(50, len(features_df)))
+    features_df_safe = features_df.copy()
 
-    # FORCE numeric safety
+    # force FULL numeric conversion again (critical fix)
+    features_df_safe = features_df_safe.apply(pd.to_numeric, errors="coerce")
+    features_df_safe = features_df_safe.fillna(features_df_safe.median(numeric_only=True))
+    features_df_safe = features_df_safe.astype(np.float32)
+
+    # ---------------------------
+    # SAFE SHAP INPUTS
+    # ---------------------------
+    sample_row = features_df_safe.median().to_frame().T
+    background = features_df_safe.sample(min(50, len(features_df_safe)))
+
+    # extra safety (double lock)
     sample_row = sample_row.astype(np.float32)
     background = background.astype(np.float32)
 
-    # SHAP Tree Explainer (correct for XGBoost)
+    # ---------------------------
+    # SHAP
+    # ---------------------------
     explainer = shap.TreeExplainer(xgb_model)
     shap_values = explainer(sample_row)
 
+    # ---------------------------
     # Plot
+    # ---------------------------
     fig, ax = plt.subplots()
     shap.plots.waterfall(shap_values[0], show=False)
     st.pyplot(fig)
 
+    # ---------------------------
     # Feature importance
-    feature_names = features_df.columns
+    # ---------------------------
+    feature_names = features_df_safe.columns
 
     feature_impact = pd.DataFrame({
-    "Feature": feature_names,
-    "SHAP_Value": shap_values.values[0]
+        "Feature": feature_names,
+        "SHAP_Value": shap_values.values[0]
     }).sort_values(by="SHAP_Value", key=abs, ascending=False)
 
     st.markdown("**Top 3 features influencing the model:**")
