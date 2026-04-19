@@ -89,9 +89,9 @@ except Exception as e:
 # Load Models
 # ---------------------------
 try:
-    logreg_model = joblib.load("models/logreg_v2.pkl")
+    logreg_model = joblib.load("models/logreg_v3.pkl")
     xgb_model = joblib.load("models/xgb_best.pkl")
-    scaler = joblib.load("models/scaler_v2.pkl")
+    scaler = joblib.load("models/scaler_v3.pkl")
     st.success("Models loaded successfully")
 except Exception as e:
     st.error(f"Model load error: {e}")
