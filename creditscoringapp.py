@@ -38,10 +38,19 @@ FEATURE_COLUMNS = [
 # Data Cleaning Function
 # ---------------------------
 def clean_numeric_columns(df):
-    return df.applymap(
-        lambda x: float(str(x).replace("[", "").replace("]", "").replace("'", "").replace('"',''))
-        if isinstance(x, str) else x
-    )
+    df = df.copy()
+
+    for col in df.columns:
+        df[col] = (
+            df[col]
+            .astype(str)
+            .str.replace(r"[\[\]'\"]", "", regex=True)
+            .str.strip()
+        )
+
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    return df
 
 # ---------------------------
 # Initialize batch variable early
