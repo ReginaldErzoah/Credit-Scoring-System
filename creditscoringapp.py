@@ -140,9 +140,11 @@ try:
     st.pyplot(fig)
 
     # Feature importance
+    feature_names = features_df.columns
+
     feature_impact = pd.DataFrame({
-        "Feature": FEATURES_COLUMNS := features_df.columns,
-        "SHAP_Value": shap_values.values[0]
+    "Feature": feature_names,
+    "SHAP_Value": shap_values.values[0]
     }).sort_values(by="SHAP_Value", key=abs, ascending=False)
 
     st.markdown("**Top 3 features influencing the model:**")
