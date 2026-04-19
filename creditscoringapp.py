@@ -32,7 +32,6 @@ FEATURE_COLUMNS = [
     "NumberRealEstateLoansOrLines",
     "NumberOfTime60-89DaysPastDueNotWorse",
     "NumberOfDependents",
-    "TotalPastDue",
     "DebtPerIncome"
 ]
 
@@ -77,11 +76,6 @@ try:
     data_df.fillna(data_df.median(), inplace=True)
 
     # Feature engineering
-    data_df['TotalPastDue'] = (
-        data_df['NumberOfTime30-59DaysPastDueNotWorse'] +
-        data_df['NumberOfTime60-89DaysPastDueNotWorse'] +
-        data_df['NumberOfTimes90DaysLate']
-    )
     data_df['DebtPerIncome'] = data_df['DebtRatio'] * data_df['MonthlyIncome']
     data_df = data_df[FEATURE_COLUMNS]
 
@@ -168,11 +162,6 @@ if file:
     batch = clean_numeric_columns(batch)
     batch.fillna(batch.median(), inplace=True)
 
-    batch['TotalPastDue'] = (
-        batch['NumberOfTime30-59DaysPastDueNotWorse'] +
-        batch['NumberOfTime60-89DaysPastDueNotWorse'] +
-        batch['NumberOfTimes90DaysLate']
-    )
     batch['DebtPerIncome'] = batch['DebtRatio'] * batch['MonthlyIncome']
 
     batch_features = batch[FEATURE_COLUMNS]
