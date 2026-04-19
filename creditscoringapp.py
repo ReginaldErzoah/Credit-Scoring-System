@@ -130,7 +130,7 @@ try:
 
     # Waterfall plot
     fig, ax = plt.subplots()
-    shap.plots.waterfall(shap_values[0], show=False)
+    shap.plots.waterfall(shap_values, show=False)
     st.pyplot(fig)
 
     # Top 3 features
