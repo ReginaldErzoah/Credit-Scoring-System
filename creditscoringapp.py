@@ -125,7 +125,7 @@ try:
         background = sample_row
 
     # SHAP explainer
-    explainer = shap.Explainer(lambda x: xgb_model.predict_proba(x)[:,1], background)
+    explainer = shap.TreeExplainer(xgb_model)
     shap_values = explainer(sample_row)
 
     # Waterfall plot
