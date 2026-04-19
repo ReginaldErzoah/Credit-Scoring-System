@@ -150,7 +150,7 @@ try:
 
     st.markdown("**Top 3 features influencing the XGBoost prediction:**")
     for i, row in feature_impact.head(3).iterrows():
-        direction = "increases" if row['SHAP_Value'] < 0 else "decreases"
+        direction = "decreases" if row['SHAP_Value'] > 0 else "increases"
         st.write(f"- {row['Feature']} {direction} the likelihood of delinquency (impact: {row['SHAP_Value']:.2f})")
 
 except Exception as e:
