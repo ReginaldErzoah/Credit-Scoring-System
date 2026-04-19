@@ -22,16 +22,18 @@ Predictions are automatically run on the dataset loaded from Cloudflare R2. You 
 # Feature Columns
 # ---------------------------
 FEATURE_COLUMNS = [
- "RevolvingUtilizationOfUnsecuredLines",
- "age",
- "NumberOfTime30-59DaysPastDueNotWorse",
- "DebtRatio",
- "MonthlyIncome",
- "NumberOfOpenCreditLinesAndLoans",
- "NumberOfTimes90DaysLate",
- "NumberRealEstateLoansOrLines",
- "NumberOfTime60-89DaysPastDueNotWorse",
- "NumberOfDependents"
+    "RevolvingUtilizationOfUnsecuredLines",
+    "Age",
+    "NumberOfTime30-59DaysPastDueNotWorse",
+    "DebtRatio",
+    "MonthlyIncome",
+    "NumberOfOpenCreditLinesAndLoans",
+    "NumberOfTimes90DaysLate",
+    "NumberRealEstateLoansOrLines",
+    "NumberOfTime60-89DaysPastDueNotWorse",
+    "NumberOfDependents",
+    "TotalPastDue",
+    "DebtPerIncome"
 ]
 
 # ---------------------------
@@ -132,7 +134,7 @@ try:
         background = sample_row
 
     # SHAP explainer
-    explainer = shap.TreeExplainer(xgb_model)
+    explainer = shap.Explainer(lambda x: xgb_model.predict_proba(x)[:,1], background)
     shap_values = explainer(sample_row)
 
     # Waterfall plot
