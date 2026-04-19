@@ -32,7 +32,6 @@ FEATURE_COLUMNS = [
     "NumberRealEstateLoansOrLines",
     "NumberOfTime60-89DaysPastDueNotWorse",
     "NumberOfDependents",
-    "DebtPerIncome"
 ]
 
 # ---------------------------
@@ -75,8 +74,6 @@ try:
     data_df = clean_numeric_columns(data_df)
     data_df.fillna(data_df.median(), inplace=True)
 
-    # Feature engineering
-    data_df['DebtPerIncome'] = data_df['DebtRatio'] * data_df['MonthlyIncome']
     data_df = data_df[FEATURE_COLUMNS]
 
     st.success("Dataset loaded from Cloudflare R2 bucket")
@@ -144,7 +141,7 @@ try:
 
     st.markdown("**Top 3 features influencing the XGBoost prediction:**")
     for i, row in feature_impact.head(3).iterrows():
-        direction = "decreases" if row['SHAP_Value'] > 0 else "increases"
+        direction = "increases" if row['SHAP_Value'] > 0 else "decreases"
         st.write(f"- {row['Feature']} {direction} the likelihood of delinquency (impact: {row['SHAP_Value']:.2f})")
 
 except Exception as e:
@@ -161,8 +158,6 @@ if file:
     batch = pd.read_csv(file)
     batch = clean_numeric_columns(batch)
     batch.fillna(batch.median(), inplace=True)
-
-    batch['DebtPerIncome'] = batch['DebtRatio'] * batch['MonthlyIncome']
 
     batch_features = batch[FEATURE_COLUMNS]
     batch_scaled = scaler.transform(batch_features)
