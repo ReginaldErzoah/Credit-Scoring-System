@@ -14,7 +14,7 @@ st.set_page_config(page_title="Credit Scoring System", layout="wide")
 st.title("Credit Scoring & Loan Decision System")
 
 st.markdown("""
-This app predicts the likelihood of a customer defaulting on a loan using Logistic Regression and XGBoost models. 
+This app predicts the likelihood of a customer defaulting on a loan using Logistic Regression and XGBoost models.
 Predictions are automatically run on the dataset loaded from Cloudflare R2. You can also upload your own CSV for batch predictions.
 """)
 
@@ -37,7 +37,7 @@ FEATURE_COLUMNS = [
 ]
 
 # ---------------------------
-# CLEANING (FIXED)
+# SAFE DATA CLEANING (FIXED)
 # ---------------------------
 def clean_numeric_columns(df):
     def safe_convert(x):
@@ -51,19 +51,20 @@ def clean_numeric_columns(df):
 
     df = df.applymap(safe_convert)
 
-    # force full numeric conversion (CRITICAL FIX)
+    # Force full numeric conversion (VERY IMPORTANT for SHAP + XGBoost)
     df = df.apply(pd.to_numeric, errors="coerce")
 
     return df
 
+
 # ---------------------------
-# INIT
+# Initialize
 # ---------------------------
 batch = None
 data_df = None
 
 # ---------------------------
-# LOAD DATA
+# Load Data
 # ---------------------------
 try:
     R2_ENDPOINT = st.secrets["R2_ENDPOINT_URL"]
@@ -80,15 +81,15 @@ try:
 
     objects = s3.list_objects_v2(Bucket=R2_BUCKET)
     file_name = next((obj['Key'] for obj in objects['Contents'] if obj['Key'].endswith('.csv')), None)
-
     obj = s3.get_object(Bucket=R2_BUCKET, Key=file_name)
+
     data_df = pd.read_csv(BytesIO(obj['Body'].read()))
 
-    # CLEAN (FIXED)
+    # 🔥 FIX: CLEAN BEFORE ANYTHING ELSE
     data_df = clean_numeric_columns(data_df)
     data_df.fillna(data_df.median(numeric_only=True), inplace=True)
 
-    # FEATURE ENGINEERING
+    # Feature engineering
     data_df['TotalPastDue'] = (
         data_df['NumberOfTime30-59DaysPastDueNotWorse'] +
         data_df['NumberOfTime60-89DaysPastDueNotWorse'] +
@@ -106,7 +107,7 @@ except Exception as e:
     st.stop()
 
 # ---------------------------
-# LOAD MODELS
+# Load Models
 # ---------------------------
 try:
     logreg_model = joblib.load("models/logreg_v2.pkl")
@@ -120,15 +121,11 @@ except Exception as e:
     st.stop()
 
 # ---------------------------
-# PREDICTIONS
+# Predictions
 # ---------------------------
-st.subheader("Predictions on Cloudflare Dataset")
+st.subheader("Predictions on Dataset")
 
 features_df = data_df[FEATURE_COLUMNS].copy()
-
-# FINAL SAFETY CLEAN (IMPORTANT FIX)
-features_df = features_df.apply(pd.to_numeric, errors="coerce")
-features_df.fillna(features_df.median(), inplace=True)
 
 scaled_data = scaler.transform(features_df)
 
@@ -136,35 +133,33 @@ data_df["LogReg_Prob"] = logreg_model.predict_proba(scaled_data)[:, 1]
 data_df["XGB_Prob"] = xgb_model.predict_proba(features_df)[:, 1]
 
 st.dataframe(data_df)
-st.download_button("Download Predictions", data_df.to_csv(index=False), "predictions.csv")
+
+st.download_button(
+    "Download Predictions",
+    data_df.to_csv(index=False),
+    "predictions.csv"
+)
 
 # ---------------------------
-# SHAP SECTION (FIXED)
+# SHAP INTERPRETATION (FIXED)
 # ---------------------------
 st.subheader("Business Interpretation (XGBoost)")
 
 try:
-    if batch is not None and all(col in batch.columns for col in FEATURE_COLUMNS):
-        sample_row = batch[FEATURE_COLUMNS].iloc[[0]]
-        background = batch[FEATURE_COLUMNS].sample(min(50, len(batch)))
+    # Safe sample row (numeric only)
+    sample_row = data_df[FEATURE_COLUMNS].select_dtypes(include=np.number).median().to_frame().T
 
-    else:
-        sample_row = data_df[FEATURE_COLUMNS].iloc[[0]]
-        background = data_df[FEATURE_COLUMNS].sample(min(50, len(data_df)))
+    background = data_df[FEATURE_COLUMNS].select_dtypes(include=np.number).sample(
+        min(50, len(data_df))
+    )
 
-    # FINAL SAFETY CLEAN BEFORE SHAP (CRITICAL FIX)
-    sample_row = sample_row.apply(pd.to_numeric, errors="coerce")
-    background = background.apply(pd.to_numeric, errors="coerce")
-
-    sample_row.fillna(sample_row.median(numeric_only=True), inplace=True)
-    background.fillna(background.median(numeric_only=True), inplace=True)
-
-    # SHAP
+    # SHAP explainer (correct for tree models)
     explainer = shap.TreeExplainer(xgb_model)
     shap_values = explainer(sample_row)
 
-    # PLOT
+    # Plot
     fig, ax = plt.subplots()
+
     shap.waterfall_plot(
         shap.Explanation(
             values=shap_values[0],
@@ -173,21 +168,22 @@ try:
         ),
         show=False
     )
+
     st.pyplot(fig)
 
-    # FEATURE IMPORTANCE
+    # Feature importance
     feature_impact = pd.DataFrame({
         "Feature": FEATURE_COLUMNS,
         "SHAP_Value": shap_values[0]
     }).sort_values(by="SHAP_Value", key=abs, ascending=False)
 
-    st.markdown("**Top 3 features influencing the XGBoost prediction:**")
+    st.markdown("**Top 3 features influencing the prediction:**")
 
     for i, row in feature_impact.head(3).iterrows():
         direction = "increases" if row["SHAP_Value"] > 0 else "decreases"
 
         st.write(
-            f"- {row['Feature']} {direction} the likelihood of delinquency "
+            f"- {row['Feature']} {direction} likelihood of delinquency "
             f"(impact: {row['SHAP_Value']:.2f})"
         )
 
@@ -195,9 +191,9 @@ except Exception as e:
     st.warning(f"Business Interpretation failed: {e}")
 
 # ---------------------------
-# UPLOAD SECTION
+# Batch Upload
 # ---------------------------
-st.subheader("Upload Your CSV for Batch Predictions")
+st.subheader("Upload CSV for Batch Predictions")
 
 file = st.file_uploader("Upload CSV", type=["csv"])
 
@@ -216,14 +212,15 @@ if file:
     batch['DebtPerIncome'] = batch['DebtRatio'] * batch['MonthlyIncome']
 
     batch_features = batch[FEATURE_COLUMNS]
-
-    batch_features = batch_features.apply(pd.to_numeric, errors="coerce")
-    batch_features.fillna(batch_features.median(), inplace=True)
-
     batch_scaled = scaler.transform(batch_features)
 
     batch["LogReg_Prob"] = logreg_model.predict_proba(batch_scaled)[:, 1]
     batch["XGB_Prob"] = xgb_model.predict_proba(batch_features)[:, 1]
 
     st.dataframe(batch)
-    st.download_button("Download Predictions", batch.to_csv(index=False), "predictions.csv")
+
+    st.download_button(
+        "Download Predictions",
+        batch.to_csv(index=False),
+        "predictions.csv"
+    )
