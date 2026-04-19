@@ -133,24 +133,16 @@ try:
         sample_row = pd.DataFrame(np.zeros((1, len(FEATURE_COLUMNS))), columns=FEATURE_COLUMNS)
         background = sample_row
 
-    # SHAP explainer (correct for tree models)
+    # SHAP explainer
     explainer = shap.TreeExplainer(xgb_model)
     shap_values = explainer(sample_row)
 
-    # Plot
+    # Waterfall plot
     fig, ax = plt.subplots()
-
-    shap.waterfall_plot(
-        shap.Explanation(
-            values=shap_values[0],
-            base_values=explainer.expected_value,
-            data=sample_row.iloc[0]
-        ),
-        show=False
-    )
-
+    shap.plots.waterfall(shap_values[0], show=False)
     st.pyplot(fig)
 
+    # Top 3 features
     # Feature importance
     feature_impact = pd.DataFrame({
         "Feature": FEATURE_COLUMNS,
