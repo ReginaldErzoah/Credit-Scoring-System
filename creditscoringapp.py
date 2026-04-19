@@ -139,10 +139,19 @@ try:
         "SHAP_Value": shap_values.values[0]
     }).sort_values(by="SHAP_Value", key=abs, ascending=False)
 
-    st.markdown("**Top 3 features influencing the XGBoost prediction:**")
-    for i, row in feature_impact.head(3).iterrows():
-        direction = "increases" if row['SHAP_Value'] > 0 else "decreases"
-        st.write(f"- {row['Feature']} {direction} the likelihood of delinquency (impact: {row['SHAP_Value']:.2f})")
+    st.markdown("**Top 3 features influencing default risk:**")
+
+    for _, row in feature_impact.head(3).iterrows():
+        direction = (
+        "increases default risk"
+        if row["SHAP_Value"] > 0
+        else "reduces default risk"
+    )
+
+    st.write(
+        f"- {row['Feature']} {direction} (impact: {row['SHAP_Value']:.4f})"
+    )
+
 
 except Exception as e:
     st.warning(f"Business Interpretation failed: {e}")
