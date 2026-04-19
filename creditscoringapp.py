@@ -133,6 +133,9 @@ try:
         sample_row = pd.DataFrame(np.zeros((1, len(FEATURE_COLUMNS))), columns=FEATURE_COLUMNS)
         background = sample_row
 
+    sample_row = sample_row.astype(float)
+    background = background.astype(float)
+
     # SHAP explainer
     explainer = shap.TreeExplainer(xgb_model)
     shap_values = explainer(sample_row)
