@@ -83,7 +83,6 @@ The dataset consists of historical credit information, including:
 * `NumberOfTimes90DaysLate`
 * `NumberRealEstateLoansOrLines`
 * `NumberOfDependents`
-* And more engineered features like `TotalPastDue` and `DebtPerIncome`
 
 Data is hosted in **Cloudflare R2** for secure, scalable storage.
 The app accesses the dataset directly from the cloud bucket.
