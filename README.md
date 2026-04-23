@@ -124,3 +124,6 @@ Customer Credit Data → Cloudflare R2 → Streamlit App → Predictions + SHAP 
 ## Update & Version Log
 
 * **Version 1.0** (March 2026): Initial release with automated predictions, SHAP interpretability, batch uploads, and containerized deployment using Docker
+
+## License
+This project is licensed under the MIT License - see the LICENSE file for details.
